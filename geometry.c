@@ -15,7 +15,13 @@ struct Geometry* make_geometry(const char* filename, enum GeometryType type)
 {
   struct Geometry* geometry = malloc(sizeof(struct Geometry));
 
-  const struct aiScene* scene = aiImportFile(filename, type == GEOMETRY_TYPE_TRIS ? aiProcess_Triangulate : 0);
+  enum aiPostProcessSteps flags = aiProcess_JoinIdenticalVertices;
+  if (type == GEOMETRY_TYPE_TRIS)
+  {
+    flags |= aiProcess_Triangulate;
+  }
+
+  const struct aiScene* scene = aiImportFile(filename, flags);
   if (!scene)
   {
     printf("Failed to load geometry \"%s\"\n", filename);
@@ -66,34 +72,31 @@ struct Geometry* make_geometry(const char* filename, enum GeometryType type)
     return NULL;
   }
 
-  uint32_t vertex_counter = 0;
   for (unsigned int vertex_index = 0; vertex_index < mesh->mNumVertices; ++vertex_index)
   {
     uint32_t index = 0;
 
     const struct aiVector3D* vertex = &mesh->mVertices[vertex_index];
-    geometry->vertices[vertex_counter * geometry->floats_per_vertex + index + 0] = vertex->x;
-    geometry->vertices[vertex_counter * geometry->floats_per_vertex + index + 1] = vertex->y;
-    geometry->vertices[vertex_counter * geometry->floats_per_vertex + index + 2] = vertex->z;
+    geometry->vertices[vertex_index * geometry->floats_per_vertex + index + 0] = vertex->x;
+    geometry->vertices[vertex_index * geometry->floats_per_vertex + index + 1] = vertex->y;
+    geometry->vertices[vertex_index * geometry->floats_per_vertex + index + 2] = vertex->z;
     index += 3;
 
     if (mesh->mNormals)
     {
       const struct aiVector3D* normal = &mesh->mNormals[vertex_index];
-      geometry->vertices[vertex_counter * geometry->floats_per_vertex + index + 0] = normal->x;
-      geometry->vertices[vertex_counter * geometry->floats_per_vertex + index + 1] = normal->y;
-      geometry->vertices[vertex_counter * geometry->floats_per_vertex + index + 2] = normal->z;
+      geometry->vertices[vertex_index * geometry->floats_per_vertex + index + 0] = normal->x;
+      geometry->vertices[vertex_index * geometry->floats_per_vertex + index + 1] = normal->y;
+      geometry->vertices[vertex_index * geometry->floats_per_vertex + index + 2] = normal->z;
       index += 3;
     }
 
     if (mesh->mTextureCoords[0])
     {
       const struct aiVector3D* uvs = &mesh->mTextureCoords[0][vertex_index];
-      geometry->vertices[vertex_counter * geometry->floats_per_vertex + index + 0] = uvs->x;
-      geometry->vertices[vertex_counter * geometry->floats_per_vertex + index + 1] = uvs->y;
+      geometry->vertices[vertex_index * geometry->floats_per_vertex + index + 0] = uvs->x;
+      geometry->vertices[vertex_index * geometry->floats_per_vertex + index + 1] = uvs->y;
     }
-
-    ++vertex_counter;
   }
 
   for (unsigned int face_index = 0; face_index < mesh->mNumFaces; ++face_index)

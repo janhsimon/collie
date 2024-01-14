@@ -14,11 +14,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define PLAYER_RADIUS 1.5f
+#define PLAYER_RADIUS 0.75f
+#define PLAYER_HEIGHT 3.0f
 #define PLAYER_MOVE_SPEED 10.0f
 
 static const vec4 color_hit = { 1.0f, 0.0f, 0.0f, 1.0f };
 static const vec4 color_miss = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+static vec3 gravity = { 0.0f, -0.1f, 0.0f };
 
 static GLuint shader_program;
 static GLint world_uniform_location, viewproj_uniform_location, color_uniform_location;
@@ -31,7 +34,7 @@ static bool in_contact;
 
 bool generate_player()
 {
-  glm_translate_make(transform, (vec3){ 0.0f, 2.0f, 0.0f });
+  glm_translate_make(transform, (vec3){ 0.0f, 0.01f, 0.0f });
 
   sphere = make_geometry("objects/sphere.obj", GEOMETRY_TYPE_QUADS);
   if (!sphere)
@@ -82,6 +85,11 @@ mat4* get_player_transform()
   return &transform;
 }
 
+float get_player_height()
+{
+  return PLAYER_HEIGHT;
+}
+
 void update_player(const vec2 cursor_delta, float delta_time)
 {
   // Yaw the player based on cursor movement
@@ -90,25 +98,32 @@ void update_player(const vec2 cursor_delta, float delta_time)
   // Move the player
   {
     glm_vec3_zero(velocity);
-    if (is_key_down(KEY_W))
+
+    // Keyboard input
     {
-      glm_vec3_add(velocity, transform[2], velocity);
+      if (is_key_down(KEY_W))
+      {
+        glm_vec3_add(velocity, transform[2], velocity);
+      }
+
+      if (is_key_down(KEY_S))
+      {
+        glm_vec3_sub(velocity, transform[2], velocity);
+      }
+
+      if (is_key_down(KEY_A))
+      {
+        glm_vec3_add(velocity, transform[0], velocity);
+      }
+
+      if (is_key_down(KEY_D))
+      {
+        glm_vec3_sub(velocity, transform[0], velocity);
+      }
     }
 
-    if (is_key_down(KEY_S))
-    {
-      glm_vec3_sub(velocity, transform[2], velocity);
-    }
-
-    if (is_key_down(KEY_A))
-    {
-      glm_vec3_add(velocity, transform[0], velocity);
-    }
-
-    if (is_key_down(KEY_D))
-    {
-      glm_vec3_sub(velocity, transform[0], velocity);
-    }
+    // Also add a bit of gravity
+    glm_vec3_add(velocity, gravity, velocity);
 
     glm_vec3_scale_as(velocity, delta_time * PLAYER_MOVE_SPEED, velocity);
     glm_vec3_add(transform[3], velocity, transform[3]);
@@ -118,6 +133,11 @@ void update_player(const vec2 cursor_delta, float delta_time)
   {
     in_contact = false;
 
+    // Capsule
+    vec3 tip;
+    glm_vec3_copy(transform[3], tip);
+    tip[1] += PLAYER_HEIGHT;
+
     vec3 pen_normal;
     float pen_depth;
     for (uint32_t triangle = 0; triangle < get_triangle_count(); ++triangle)
@@ -125,7 +145,7 @@ void update_player(const vec2 cursor_delta, float delta_time)
       vec3 v0, v1, v2, n;
       get_triangle(triangle, v0, v1, v2, n);
 
-      if (sphere_triangle_collision(transform[3], PLAYER_RADIUS, v0, v1, v2, n, pen_normal, &pen_depth))
+      if (capsule_triangle_collision(transform[3], tip, PLAYER_RADIUS, v0, v1, v2, n, pen_normal, &pen_depth))
       {
         in_contact = true;
 
@@ -138,20 +158,39 @@ void update_player(const vec2 cursor_delta, float delta_time)
 
 void draw_player(const mat4 viewproj_matrix)
 {
-  mat4 sphere_matrix;
-  glm_scale_to(transform, (vec3){ PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS }, sphere_matrix);
-
   glBindVertexArray(sphere->vertex_array);
   glUseProgram(shader_program);
 
   // Set uniforms
-  glUniformMatrix4fv(world_uniform_location, 1, GL_FALSE, (float*)sphere_matrix);
   glUniformMatrix4fv(viewproj_uniform_location, 1, GL_FALSE, (float*)viewproj_matrix);
   glUniform4fv(color_uniform_location, 1, in_contact ? color_hit : color_miss);
 
-  // Draw the sphere in individual quads
-  for (uint32_t index = 0; index < sphere->index_count; index += 4)
+  // Lower sphere
+  mat4 sphere_matrix;
   {
-    glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_INT, (void*)(index * sizeof(uint32_t)));
+    glm_mat4_copy(transform, sphere_matrix);
+    glm_translate(sphere_matrix, (vec3){ 0.0f, PLAYER_RADIUS, 0.0f });
+    glm_scale(sphere_matrix, (vec3){ PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS });
+    glUniformMatrix4fv(world_uniform_location, 1, GL_FALSE, (float*)sphere_matrix);
+
+    // Draw the sphere in individual quads
+    for (uint32_t index = 0; index < sphere->index_count; index += 4)
+    {
+      glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_INT, (void*)(index * sizeof(uint32_t)));
+    }
+  }
+
+  // Upper sphere
+  {
+    glm_mat4_copy(transform, sphere_matrix);
+    glm_translate(sphere_matrix, (vec3){ 0.0f, PLAYER_HEIGHT - PLAYER_RADIUS, 0.0f });
+    glm_scale(sphere_matrix, (vec3){ PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS });
+    glUniformMatrix4fv(world_uniform_location, 1, GL_FALSE, (float*)sphere_matrix);
+
+    // Draw the sphere in individual quads
+    for (uint32_t index = 0; index < sphere->index_count; index += 4)
+    {
+      glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_INT, (void*)(index * sizeof(uint32_t)));
+    }
   }
 }
