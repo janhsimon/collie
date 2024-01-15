@@ -39,8 +39,8 @@ set(SOURCE
   window.c
   window.h
 
-  shaders/arrow.vert.glsl
-  shaders/arrow.frag.glsl
+  #shaders/arrow.vert.glsl
+  #shaders/arrow.frag.glsl
 
   shaders/level.vert.glsl
   shaders/level.frag.glsl
