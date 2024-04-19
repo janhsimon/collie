@@ -5,6 +5,7 @@
 #include "player.h"
 #include "window.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 static mat4 viewproj_matrix;
@@ -47,6 +48,9 @@ int main(int argc, char* argv[])
         const double now = get_time();
         delta_time = (float)(now - time);
         time = now;
+
+        const float dt = delta_time * 1000.0f;
+        printf("%.0f fps (%.2f ms)\n", 1000.0f / dt, dt);
       }
 
       // Get cursor input
